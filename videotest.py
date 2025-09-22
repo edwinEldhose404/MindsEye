@@ -5,16 +5,34 @@ from keras.preprocessing import image
 import warnings
 warnings.filterwarnings("ignore")
 from tensorflow.keras.preprocessing.image import load_img, img_to_array 
-from keras.models import  load_model
-import matplotlib.pyplot as plt
-import numpy as np
+# You will need to import the layers used to build your model
+from keras.models import Sequential # Or Model
+from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D # Example layers
 
-# load model
-model = load_model("best_model.h5")
+# --- PASTE YOUR MODEL CREATION CODE HERE ---
+# This is just a generic example. You must use your actual model's architecture.
+def build_emotion_model():
+    model = Sequential()
+    # ... all your Conv2D, MaxPooling2D, Flatten, Dense layers, etc.
+    # It must be IDENTICAL to the original model.
+    # For example:
+    model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(224, 224, 3)))
+    # ... more layers
+    model.add(Flatten())
+    model.add(Dense(7, activation='softmax')) # 7 emotions
+    return model
+# -----------------------------------------
 
+
+# 1. Create a new instance of the model architecture
+model = build_emotion_model()
+
+# 2. Load only the weights into this fresh model
+model.load_weights("best_model.h5")
+
+print("Model weights loaded successfully!")
 
 face_haar_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-
 
 cap = cv2.VideoCapture(0)
 

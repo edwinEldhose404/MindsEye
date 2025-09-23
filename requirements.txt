@@ -5,3 +5,5 @@ tensorflow
 matplotlib
 keras
 fer
+google-generativeai
+moviepy

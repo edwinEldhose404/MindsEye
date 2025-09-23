@@ -1,72 +1,100 @@
-import os
 import cv2
-import numpy as np
-from keras.preprocessing import image
+from deepface import DeepFace
+from fer import FER # New import for the second model
+import time
+from collections import Counter
 import warnings
+
 warnings.filterwarnings("ignore")
-from tensorflow.keras.preprocessing.image import load_img, img_to_array 
-# You will need to import the layers used to build your model
-from keras.models import Sequential # Or Model
-from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D # Example layers
 
-# --- PASTE YOUR MODEL CREATION CODE HERE ---
-# This is just a generic example. You must use your actual model's architecture.
-def build_emotion_model():
-    model = Sequential()
-    # ... all your Conv2D, MaxPooling2D, Flatten, Dense layers, etc.
-    # It must be IDENTICAL to the original model.
-    # For example:
-    model.add(Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(224, 224, 3)))
-    # ... more layers
-    model.add(Flatten())
-    model.add(Dense(7, activation='softmax')) # 7 emotions
-    return model
-# -----------------------------------------
+# --- Model Initialization ---
+# Model 1: DeepFace (uses its default emotion model)
+# Model 2: FER (Face Emotion Recognition)
+# mtcnn=True uses a more advanced face detector within FER
+emo_detector = FER(mtcnn=True)
 
-
-# 1. Create a new instance of the model architecture
-model = build_emotion_model()
-
-# 2. Load only the weights into this fresh model
-model.load_weights("best_model.h5")
-
-print("Model weights loaded successfully!")
-
+# Haar cascade for initial, fast face detection
 face_haar_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-cap = cv2.VideoCapture(0)
+# Start video capture
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
-while True:
-    ret, test_img = cap.read()  # captures frame and returns boolean value and captured image
+if not cap.isOpened():
+    print("Error: Could not open video stream.")
+    exit()
+
+# --- Variables for time-based analysis ---
+ANALYSIS_DURATION = 5  # Run for 5 seconds
+start_time = time.time()
+# This list will now store the final majority vote from each frame
+all_detected_emotions = [] 
+
+print(f"Starting ensemble emotion detection for {ANALYSIS_DURATION} seconds...")
+
+# Main loop will run for the specified duration
+while (time.time() - start_time) < ANALYSIS_DURATION:
+    ret, frame = cap.read()
     if not ret:
-        continue
-    gray_img = cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB)
-
-    faces_detected = face_haar_cascade.detectMultiScale(gray_img, 1.32, 5)
-
-    for (x, y, w, h) in faces_detected:
-        cv2.rectangle(test_img, (x, y), (x + w, y + h), (255, 0, 0), thickness=7)
-        roi_gray = gray_img[y:y + w, x:x + h]  # cropping region of interest i.e. face area from  image
-        roi_gray = cv2.resize(roi_gray, (224, 224))
-        img_pixels = image.img_to_array(roi_gray)
-        img_pixels = np.expand_dims(img_pixels, axis=0)
-        img_pixels /= 255
-
-        predictions = model.predict(img_pixels)
-
-        # find max indexed array
-        max_index = np.argmax(predictions[0])
-
-        emotions = ('angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral')
-        predicted_emotion = emotions[max_index]
-
-        cv2.putText(test_img, predicted_emotion, (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-    resized_img = cv2.resize(test_img, (1000, 700))
-    cv2.imshow('Facial emotion analysis ', resized_img)
-
-    if cv2.waitKey(10) == ord('q'):  # wait until 'q' key is pressed
         break
 
+    gray_img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces_detected = face_haar_cascade.detectMultiScale(gray_img, scaleFactor=1.3, minNeighbors=5)
+
+    for (x, y, w, h) in faces_detected:
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (25_5, 0, 0), thickness=3)
+        face_roi = frame[y:y + h, x:x + w]
+        
+        # List to hold predictions for the CURRENT face from all models
+        current_face_predictions = []
+
+        # --- Prediction from Model 1: DeepFace ---
+        try:
+            analysis = DeepFace.analyze(face_roi, actions=['emotion'], enforce_detection=False)
+            if isinstance(analysis, list):
+                analysis = analysis[0]
+            current_face_predictions.append(analysis['dominant_emotion'])
+        except Exception:
+            pass # Ignore if DeepFace fails
+
+        # --- Prediction from Model 2: FER ---
+        try:
+            result = emo_detector.detect_emotions(face_roi)
+            if result:
+                # Get the emotion with the highest score from FER's output
+                dominant_emotion_fer = max(result[0]['emotions'], key=result[0]['emotions'].get)
+                current_face_predictions.append(dominant_emotion_fer)
+        except Exception:
+            pass # Ignore if FER fails
+        
+        # --- Ensemble Logic: Find the majority vote for the current frame ---
+        if current_face_predictions:
+            # Find the most common emotion among the predictions
+            majority_emotion = Counter(current_face_predictions).most_common(1)[0][0]
+            all_detected_emotions.append(majority_emotion)
+            
+            # Display the final majority vote on the screen
+            display_text = f"VOTE: {majority_emotion}"
+            cv2.putText(frame, display_text, (int(x), int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+    cv2.imshow('Ensemble Emotion Analysis', frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# --- Cleanup and Final Calculation ---
 cap.release()
-cv2.destroyAllWindows
+cv2.destroyAllWindows()
+
+print("\n-------------------------------------------")
+print(f"Analysis complete after {ANALYSIS_DURATION} seconds.")
+
+if all_detected_emotions:
+    # Calculate the overall majority emotion from the entire session
+    overall_majority = Counter(all_detected_emotions).most_common(1)[0][0]
+    
+    print(f"\nOverall Majority Emotion: {overall_majority}")
+    print(f"Frame-by-frame majority votes: {all_detected_emotions}")
+else:
+    print("\nNo emotions were detected in the time frame.")
+
+print("-------------------------------------------")

@@ -39,6 +39,7 @@ def main():
     print("Let's reflect on your entry.")
 
     api_key = os.getenv("GOOGLE_API_KEY")
+    # Use : [System.Environment]::SetEnvironmentVariable("API_KEY", "your_super_secret_api_key_goes_here", "User")
 
     # Get user input
     print("-" * 30)

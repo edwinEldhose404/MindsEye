@@ -38,16 +38,7 @@ def main():
     print("📝 Welcome to your AI-powered Diary Advisor!")
     print("Let's reflect on your entry.")
 
-    # api_key = os.getenv("GOOGLE_API_KEY")
-    api_key = "AIzaSyBF4et7OkcLrb1jhEO72GrMM2loV2lmBKo" 
-
-    if not api_key:
-        print("\nYour Google API key was not found as an environment variable (GOOGLE_API_KEY).")
-        api_key = input("Please enter your Google API key to continue: ").strip()
-
-    if not api_key:
-        print("\nAn API key is required to run this program. Exiting.")
-        return
+    api_key = os.getenv("GOOGLE_API_KEY")
 
     # Get user input
     print("-" * 30)
@@ -59,7 +50,6 @@ def main():
         print("Both an emotion and a diary snippet are needed. Please try again.")
         return
 
-    print("\n🤔 Thinking... Here is some advice for you:")
     print("-" * 30)
 
     # Get and display the advice from Gemini

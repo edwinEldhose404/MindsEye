@@ -7,3 +7,5 @@ keras
 fer
 google-generativeai
 moviepy
+librosa
+sounddevice

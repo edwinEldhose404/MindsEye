@@ -1,37 +1,30 @@
 import cv2
 from deepface import DeepFace
-from fer import FER # New import for the second model
+from fer import FER 
 import time
 from collections import Counter
 import warnings
 
 warnings.filterwarnings("ignore")
 
-# --- Model Initialization ---
 # Model 1: DeepFace (uses its default emotion model)
 # Model 2: FER (Face Emotion Recognition)
-# mtcnn=True uses a more advanced face detector within FER
 emo_detector = FER(mtcnn=True)
 
-# Haar cascade for initial, fast face detection
 face_haar_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-# Start video capture
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 if not cap.isOpened():
     print("Error: Could not open video stream.")
     exit()
 
-# --- Variables for time-based analysis ---
-ANALYSIS_DURATION = 5  # Run for 5 seconds
+ANALYSIS_DURATION = 5 
 start_time = time.time()
-# This list will now store the final majority vote from each frame
 all_detected_emotions = [] 
 
 print(f"Starting ensemble emotion detection for {ANALYSIS_DURATION} seconds...")
 
-# Main loop will run for the specified duration
 while (time.time() - start_time) < ANALYSIS_DURATION:
     ret, frame = cap.read()
     if not ret:
@@ -44,7 +37,6 @@ while (time.time() - start_time) < ANALYSIS_DURATION:
         cv2.rectangle(frame, (x, y), (x + w, y + h), (25_5, 0, 0), thickness=3)
         face_roi = frame[y:y + h, x:x + w]
         
-        # List to hold predictions for the CURRENT face from all models
         current_face_predictions = []
 
         # --- Prediction from Model 1: DeepFace ---
@@ -54,7 +46,7 @@ while (time.time() - start_time) < ANALYSIS_DURATION:
                 analysis = analysis[0]
             current_face_predictions.append(analysis['dominant_emotion'])
         except Exception:
-            pass # Ignore if DeepFace fails
+            pass 
 
         # --- Prediction from Model 2: FER ---
         try:
@@ -64,15 +56,12 @@ while (time.time() - start_time) < ANALYSIS_DURATION:
                 dominant_emotion_fer = max(result[0]['emotions'], key=result[0]['emotions'].get)
                 current_face_predictions.append(dominant_emotion_fer)
         except Exception:
-            pass # Ignore if FER fails
+            pass 
         
-        # --- Ensemble Logic: Find the majority vote for the current frame ---
         if current_face_predictions:
-            # Find the most common emotion among the predictions
             majority_emotion = Counter(current_face_predictions).most_common(1)[0][0]
             all_detected_emotions.append(majority_emotion)
-            
-            # Display the final majority vote on the screen
+        
             display_text = f"VOTE: {majority_emotion}"
             cv2.putText(frame, display_text, (int(x), int(y) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
@@ -81,7 +70,6 @@ while (time.time() - start_time) < ANALYSIS_DURATION:
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# --- Cleanup and Final Calculation ---
 cap.release()
 cv2.destroyAllWindows()
 
@@ -89,7 +77,6 @@ print("\n-------------------------------------------")
 print(f"Analysis complete after {ANALYSIS_DURATION} seconds.")
 
 if all_detected_emotions:
-    # Calculate the overall majority emotion from the entire session
     overall_majority = Counter(all_detected_emotions).most_common(1)[0][0]
     
     print(f"\nOverall Majority Emotion: {overall_majority}")

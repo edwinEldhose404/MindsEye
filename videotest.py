@@ -36,7 +36,10 @@ def videotest():
         for (x, y, w, h) in faces_detected:
             cv2.rectangle(frame, (x, y), (x + w, y + h), (25_5, 0, 0), thickness=3)
             face_roi = frame[y:y + h, x:x + w]
-            
+
+            if face_roi is None or face_roi.size == 0:
+                continue
+
             current_face_predictions = []
 
             # --- Prediction from Model 1: DeepFace ---
@@ -73,7 +76,11 @@ def videotest():
     cap.release()
     cv2.destroyAllWindows()
 
+    if len(all_detected_emotions) == 0:
+        return "No emotion detected"
+
     overall_majority = Counter(all_detected_emotions).most_common(1)[0][0]
+
 
     return overall_majority
 
